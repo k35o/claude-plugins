@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mdn": {
+      "type": "http",
+      "url": "https://mcp.mdn.mozilla.net/"
+    },
+    "fnox": {
+      "command": "fnox",
+      "args": ["mcp"]
+    }
+  }
+}

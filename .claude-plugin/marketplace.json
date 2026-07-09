@@ -1,0 +1,13 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "k8o",
+  "description": "k8o's personal Claude Code plugins",
+  "owner": { "name": "k8o" },
+  "plugins": [
+    {
+      "name": "mcp",
+      "source": "./plugins/mcp",
+      "description": "k8o's global MCP servers"
+    }
+  ]
+}
