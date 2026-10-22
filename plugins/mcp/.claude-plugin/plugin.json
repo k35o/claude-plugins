@@ -1,6 +1,6 @@
 {
   "name": "mcp",
   "description": "k8o's global MCP servers",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": { "name": "k8o" }
 }

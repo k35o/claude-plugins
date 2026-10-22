@@ -6,11 +6,9 @@
     },
     "fnox": {
       "command": "fnox",
-      "args": ["mcp"]
-    },
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
+      "args": [
+        "mcp"
+      ]
     },
     "vercel": {
       "type": "http",
