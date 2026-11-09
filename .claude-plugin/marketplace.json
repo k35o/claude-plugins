@@ -8,6 +8,11 @@
       "name": "mcp",
       "source": "./plugins/mcp",
       "description": "k8o's global MCP servers"
+    },
+    {
+      "name": "hud",
+      "source": "./plugins/hud",
+      "description": "Usage limits, date, time and weather in a band above the prompt"
     }
   ]
 }
