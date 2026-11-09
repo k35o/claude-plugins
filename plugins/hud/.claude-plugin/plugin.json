@@ -1,0 +1,20 @@
+{
+  "name": "hud",
+  "version": "0.1.0",
+  "description": "Usage limits, date, time and weather in a band above the prompt",
+  "author": { "name": "k8o" },
+  "userConfig": {
+    "latitude": {
+      "type": "number",
+      "title": "緯度",
+      "description": "天気を取る場所の緯度",
+      "default": 35.6812
+    },
+    "longitude": {
+      "type": "number",
+      "title": "経度",
+      "description": "天気を取る場所の経度",
+      "default": 139.7671
+    }
+  }
+}

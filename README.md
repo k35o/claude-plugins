@@ -1,6 +1,11 @@
 # claude-plugins
 
-k8o 個人用の Claude Code プラグイン marketplace。グローバルに使う MCP サーバを宣言的に管理する。
+k8o 個人用の Claude Code プラグイン marketplace。
+
+| プラグイン | 内容 |
+| --- | --- |
+| `mcp` | グローバルに使う MCP サーバを宣言的に管理する |
+| `hud` | プロンプト上の帯に、使用上限と日付・時刻・天気を出す |
 
 ## 使い方
 
@@ -9,6 +14,7 @@ k8o 個人用の Claude Code プラグイン marketplace。グローバルに使
 ```sh
 claude plugin marketplace add k35o/claude-plugins
 claude plugin install mcp@k8o -s user
+claude plugin install hud@k8o -s user
 ```
 
 以後 MCP の増減は [`plugins/mcp/.mcp.json`](plugins/mcp/.mcp.json) を編集して push するだけ。各マシンでは:
@@ -28,6 +34,14 @@ claude plugin marketplace update k8o
   "some-api": { "command": "fnox", "args": ["exec", "--", "some-mcp-server"] }
 }
 ```
+
+## hud
+
+プロンプト上の帯の左に 5時間・7日の使用率とリセット時刻を、右に日付・時刻・天気（今日の最高・最低気温と降水確率つき）を出す。
+
+- 使用率はサブスクリプションで使っているときだけ出る。セッションを開いた直後は、最初の応答が返るまで出ない。
+- 天気は [Open-Meteo](https://open-meteo.com/) から 30 分ごとに取る。API キーは要らない。
+- 場所は東京駅の緯度経度が既定。設定メニューの `hud` の緯度・経度で変える。
 
 ## 注意
 
