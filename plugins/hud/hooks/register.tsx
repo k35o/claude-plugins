@@ -10,7 +10,10 @@ type Weather = {
 }
 
 const MINUTE = 60_000
+const USAGE_INTERVAL = 5 * MINUTE
 const WEATHER_INTERVAL = 30 * MINUTE
+const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const WINDOWS = ['five_hour', 'seven_day'] as const
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 const LABELS: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
 const BAR_WIDTH = 48
@@ -76,9 +79,51 @@ const parseWeather = (text: string): Weather | undefined => {
     : undefined
 }
 
+const parseUsage = (text: string): SessionRateLimit[] => {
+  const usage = JSON.parse(text)
+
+  return WINDOWS.flatMap(kind => {
+    const window = usage?.[kind]
+
+    if (typeof window?.utilization !== 'number') {
+      return []
+    }
+
+    return [
+      typeof window.resets_at === 'string'
+        ? { kind, percentUsed: window.utilization, resetsAt: window.resets_at }
+        : { kind, percentUsed: window.utilization },
+    ]
+  })
+}
+
 let weatherUrl = ''
 let limits: SessionRateLimit[] = []
 let weather: Weather | undefined
+
+// セッションの応答に付く使用率は、他のセッションや端末で使った分が次の応答まで
+// 反映されないので、/usage と同じ取得先からアカウント全体の値を取る。
+const loadUsage = async ($: EngineInterface) => {
+  const authorization = await $.session.authorize()
+
+  if (authorization?.kind !== 'bearer') {
+    return
+  }
+
+  try {
+    const response = await $.http.fetch(USAGE_URL, {
+      auth: authorization.handle,
+      headers: { 'anthropic-beta': 'oauth-2025-04-20' },
+    })
+
+    if (response.ok) {
+      limits = parseUsage(response.text)
+    }
+  } catch {
+    return
+  }
+  $.ui.invalidate('ui.render')
+}
 
 const loadWeather = async ($: EngineInterface) => {
   try {
@@ -101,24 +146,22 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
 
-    limits = (await $.session.usage()).rateLimits
-
     // 毎分の更新を分の変わり目に揃える。
     const now = await $.clock.now()
     $.clock.after(MINUTE - (now % MINUTE), () => {
       $.ui.invalidate('ui.render')
       $.clock.every(MINUTE, () => $.ui.invalidate('ui.render'))
     })
+    $.clock.every(USAGE_INTERVAL, () => void loadUsage($))
     $.clock.every(WEATHER_INTERVAL, () => void loadWeather($))
-    await loadWeather($)
+    await Promise.all([loadUsage($), loadWeather($)])
 
     return started
   })
 
   on('session.measure', ($, e, next) => {
     if (e.changed.includes('rateLimits')) {
-      limits = e.rateLimits
-      $.ui.invalidate('ui.render')
+      void loadUsage($)
     }
 
     return next(e)

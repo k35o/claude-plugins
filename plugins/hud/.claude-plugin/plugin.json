@@ -1,6 +1,6 @@
 {
   "name": "hud",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Usage limits, date, time and weather in a band above the prompt",
   "author": { "name": "k8o" },
   "userConfig": {
