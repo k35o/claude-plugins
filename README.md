@@ -6,6 +6,7 @@ k8o 個人用の Claude Code プラグイン marketplace。
 | --- | --- |
 | `mcp` | グローバルに使う MCP サーバを宣言的に管理する |
 | `hud` | プロンプト上の帯に、使用上限と日付・時刻・天気を出す |
+| `guard` | 危険なシェルコマンドと、他のリポジトリへの被リンクになる参照を実行前に拒否する |
 
 ## 使い方
 
@@ -15,6 +16,7 @@ k8o 個人用の Claude Code プラグイン marketplace。
 claude plugin marketplace add k35o/claude-plugins
 claude plugin install mcp@k8o -s user
 claude plugin install hud@k8o -s user
+claude plugin install guard@k8o -s user
 ```
 
 以後 MCP の増減は [`plugins/mcp/.mcp.json`](plugins/mcp/.mcp.json) を編集して push するだけ。各マシンでは:
@@ -42,6 +44,21 @@ claude plugin marketplace update k8o
 - 使用率はサブスクリプションで使っているときだけ出る。セッションを開いた直後は、最初の応答が返るまで出ない。
 - 天気は [Open-Meteo](https://open-meteo.com/) から 30 分ごとに取る。API キーは要らない。
 - 場所は東京駅の緯度経度が既定。設定メニューの `hud` の緯度・経度で変える。
+
+## guard
+
+Bash のコマンドを実行前に調べ、次のどれかに当たるものを理由つきで拒否する。
+
+- `curl … | bash` のように、取得したスクリプトをそのままシェルやインタプリタに渡す
+- `chmod 777` や `o+w` で、誰でも書き込める権限にする
+- `/` や `~` を `rm -r` で再帰削除する
+- シェル起動ファイルや `~/.ssh`、Claude Code の設定やフック、プラグインにシェルから書き込む
+- キーチェーンや `fnox` から秘密の値を出力に読み出す
+- `git commit` や `gh pr create` などに渡す文面に、他のリポジトリの Issue や PR への参照（`owner/repo#123` や URL）を含める
+
+最後の参照は、GitHub が相手のリポジトリに被リンクを残すので拒否する。バッククォートで囲んだ参照はリンクにならないので通す。`--body-file` や `-F <file>` で渡したファイルの中身は見ない。
+
+判定は正規表現だけなので、すり抜ける書き方はある。権限の `deny` と `ask` は別に設定しておく。フックが例外で止まったときは、コマンドを拒否せずに実行する。
 
 ## 注意
 

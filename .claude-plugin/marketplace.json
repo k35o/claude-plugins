@@ -13,6 +13,11 @@
       "name": "hud",
       "source": "./plugins/hud",
       "description": "Usage limits, date, time and weather in a band above the prompt"
+    },
+    {
+      "name": "guard",
+      "source": "./plugins/guard",
+      "description": "Refuses unsafe shell commands and backlinks to other repositories before they run"
     }
   ]
 }

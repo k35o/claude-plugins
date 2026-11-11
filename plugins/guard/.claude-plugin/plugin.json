@@ -1,0 +1,6 @@
+{
+  "name": "guard",
+  "version": "0.1.0",
+  "description": "Refuses unsafe shell commands and backlinks to other repositories before they run",
+  "author": { "name": "k8o" }
+}
