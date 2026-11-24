@@ -1,6 +1,6 @@
 {
   "name": "guard",
   "version": "0.1.0",
-  "description": "Refuses unsafe shell commands, runtimes mise does not manage, and backlinks to other repositories before they run",
+  "description": "Refuses unsafe shell commands, runtimes mise does not manage and backlinks to other repositories, and asks before writes to shell and Claude Code configuration",
   "author": { "name": "k8o" }
 }

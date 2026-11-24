@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 
 import { refsIn, repoOf } from './external-refs'
+import { protectedFileReason, protectedRedirectReason } from './protected-paths'
 import { runtimesIn } from './unmanaged-runtimes'
 import { unsafeReason } from './unsafe-commands'
 
@@ -10,6 +11,14 @@ const commandOf = (input: unknown) =>
   'command' in input &&
   typeof input.command === 'string'
     ? input.command
+    : ''
+
+const pathOf = (input: unknown) =>
+  typeof input === 'object' &&
+  input !== null &&
+  'file_path' in input &&
+  typeof input.file_path === 'string'
+    ? input.file_path
     : ''
 
 // 失敗したフックは飛ばされて下の判定がそのまま通るので、調べきれなかった操作は人に確認する。
@@ -62,5 +71,17 @@ export const register: Register = on => {
           reason: `mise で管理していない言語のコマンド（${unmanaged.join('、')}）を実行しようとしています。スクリプトは mise で管理している node、bun、deno で書いてください。この言語が要るなら、mise に足すかをユーザーに確認してください。`,
         }
       : next(e)
+  }).catch(askPerson)
+
+  on('tool.check', { tool: 'Bash' }, (_$, e, next) => {
+    const reason = protectedRedirectReason(commandOf(e.input))
+
+    return reason ? { decision: 'ask', reason } : next(e)
+  }).catch(askPerson)
+
+  on('tool.check', { tool: ['Edit', 'Write'] }, (_$, e, next) => {
+    const reason = protectedFileReason(pathOf(e.input))
+
+    return reason ? { decision: 'ask', reason } : next(e)
   }).catch(askPerson)
 }
