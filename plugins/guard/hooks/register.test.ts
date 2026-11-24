@@ -8,8 +8,6 @@ const RUN_REMOTE =
   'guard: eval・sh -c "$(curl …)"・<(curl …) でリモート取得したコードを実行しようとしています。一旦ファイルに保存し、内容を確認してから実行してください。'
 const CHMOD_WORLD_WRITABLE =
   'guard: chmod で誰でも書き込める権限（777・o+w など）にしようとしています。必要最小の権限（例: 644 / 755）を指定してください。'
-const RM_RF_ROOT =
-  'guard: rm -r で / や ~ などルート/ホーム全体を再帰削除しようとしています。対象を具体的なパスに限定してください。'
 const WRITE_SHELL_CONFIG =
   'guard: シェル起動ファイル（~/.zshrc・~/.zshenv・~/.config/zsh/ など）や ~/.ssh に書き込もうとしています。自動実行や認証情報の改ざん経路になり得ます。'
 const WRITE_AGENT_CONFIG =
@@ -109,23 +107,6 @@ test('誰でも書き込める権限にする chmod を拒否する', async ($, 
   ])
 })
 
-test('ルートやホーム全体を再帰削除する rm を拒否する', async ($, on) => {
-  startSession(on)
-
-  await expectDenied($, RM_RF_ROOT, [
-    'rm -rf /',
-    'rm -rf /*',
-    'rm -rf --no-preserve-root /',
-    'sudo rm -rf ~',
-    'rm -rf ~/',
-    'rm -rf ~/*',
-    'rm -r -f ~',
-    'rm -rf $HOME',
-    'rm -rf "$HOME"',
-    'rm -rf ./build ~',
-  ])
-})
-
 test('シェル起動ファイルや ~/.ssh への書き込みを拒否する', async ($, on) => {
   startSession(on)
 
@@ -168,17 +149,6 @@ test('fnox から秘密の値を出力するコマンドを拒否する', async 
     'fnox -P bot get K35O_BOT_APP_ID',
     'fnox --no-color export -f env',
     'fnox --profile bot env',
-  ])
-})
-
-test('対象を絞った rm は通す', async ($, on) => {
-  startSession(on)
-
-  await expectRun($, [
-    'rm -rf ./build',
-    'rm -rf node_modules',
-    'rm -rf ~/project/dist',
-    'rm -rf /var/tmp/foo',
   ])
 })
 
@@ -246,6 +216,7 @@ test('どのルールにも当たらないコマンドは通す', async ($, on) 
     'git push origin feature',
     'pnpm install',
     'echo done >> notes.txt',
+    'rm -rf ./build',
   ])
 })
 

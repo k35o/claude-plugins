@@ -21,12 +21,6 @@ const RULES: Rule[] = [
   },
   {
     pattern:
-      /\brm\b(?=[^\n;&|]*\s-(?:[a-zA-Z]*[rR]|-recursive\b))[^\n;&|]*?\s["']?(?:\/|~|\$HOME|\$\{HOME\})\/?\*?["']?(?=$|[\s;&|])/u,
-    reason:
-      'rm -r で / や ~ などルート/ホーム全体を再帰削除しようとしています。対象を具体的なパスに限定してください。',
-  },
-  {
-    pattern:
       /(?:>>?|\btee\b(?:\s+-[a-zA-Z]+)*)\s*["']?(?:~|\$HOME|\$\{HOME\}|\/root|\/home\/[^/\s]+|\/Users\/[^/\s]+)?\/?\.(?:ssh\/|zshrc|zshenv|zprofile|zlogin|bashrc|bash_profile|bash_login|profile\b|gitconfig|config\/zsh\/)/iu,
     reason:
       'シェル起動ファイル（~/.zshrc・~/.zshenv・~/.config/zsh/ など）や ~/.ssh に書き込もうとしています。自動実行や認証情報の改ざん経路になり得ます。',
