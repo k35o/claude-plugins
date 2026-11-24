@@ -13,6 +13,11 @@
       "name": "hud",
       "source": "./plugins/hud",
       "description": "Usage limits, date, time and weather in a band above the prompt"
+    },
+    {
+      "name": "theme",
+      "source": "./plugins/theme",
+      "description": "The dark look of k8o.me for the desktop and mobile apps: its colors, and jellyfish legs drifting behind the conversation"
     }
   ]
 }
