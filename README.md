@@ -7,6 +7,7 @@ k8o 個人用の Claude Code プラグイン marketplace。
 | `mcp` | グローバルに使う MCP サーバを宣言的に管理する |
 | `hud` | プロンプト上の帯に、使用上限と日付・時刻・天気を出す |
 | `theme` | アプリの色と会話の裏の背景を、k8o.me のダークの見た目にする |
+| `guard` | 危険なシェルコマンド、mise で管理していない言語の実行、他のリポジトリへの被リンクになる参照を実行前に拒否し、設定ファイルへの書き込みを人に確認する |
 
 ## 使い方
 
@@ -17,6 +18,7 @@ claude plugin marketplace add k35o/claude-plugins
 claude plugin install mcp@k8o -s user
 claude plugin install hud@k8o -s user
 claude plugin install theme@k8o -s user
+claude plugin install guard@k8o -s user
 ```
 
 以後 MCP の増減は [`plugins/mcp/.mcp.json`](plugins/mcp/.mcp.json) を編集して push するだけ。各マシンでは:
@@ -57,6 +59,33 @@ claude plugin marketplace update k8o
 - ターミナルとエディタはテーマを描かないので、何も変わらない。
 - テーマはセッションに 1 つなので、ほかのプラグインもテーマを指定すると、後から指定したほうだけが残る。
 - `hooks/make-colors.js` は Claude Code が配る色の生成器の写しで、手を入れない。Claude Code を更新したら、plugin-authoring スキルのフォルダから写し直す。
+
+## guard
+
+ツールの呼び出しを実行前に調べ、決まりに当たるものを理由つきで拒否するか、人に確認する。
+
+Bash のコマンドが次のどれかに当たると拒否する。
+
+- `curl … | bash` のように、取得したスクリプトをそのままシェルやインタプリタに渡す
+- `chmod 777` や `666`、`o+w` で、誰でも書き込める権限にする
+- キーチェーンや `fnox` から秘密の値を出力に読み出す
+- `python` や `ruby`、`perl` のような言語のコマンドを、mise で管理していないのに実行する
+- `git commit` や `gh pr create` などに渡す文面に、他のリポジトリの Issue や PR への参照（`owner/repo#123` や URL）を含める
+
+次の場所への書き込みは、拒否せずに人に確認する。auto モードでも分類器には任せず、許可を求める窓を出す。
+
+- シェル起動ファイル（`~/.zshrc`、`~/.zshenv`、`~/.config/zsh/` など）と `~/.gitconfig`、`~/.ssh`
+- Claude Code の設定（`.claude/settings*.json`）とフック、プラグイン
+
+書き込みは、Bash のリダイレクトと `tee`、Edit と Write で見る。`cp` や `sed -i` での書き込みは見ない。
+
+言語のコマンドは `python`、`pip`、`ruby`、`gem`、`perl` を見て、`mise which` が失敗するものを拒否する。その場所の mise の設定で有効になっていれば通すので、要る言語は mise に足す。`./gen.py` のように直接実行したスクリプトの言語は見ない。
+
+他のリポジトリへの参照は、GitHub が相手のリポジトリに被リンクを残すので拒否する。バッククォートで囲んだ参照はリンクにならないので通す。`--body-file` や `-F <file>` で渡したファイルの中身は見ない。
+
+`/` や `~` の再帰削除は、Claude Code 自身が危険な操作として見ているので、guard では見ない。
+
+コマンドの文字列を正規表現で見るだけなので、すり抜ける書き方はある。コミットメッセージなどの文字列にある `chmod 777` を、誤って拒否することもある。権限の `deny` と `ask` は別に設定しておく。guard が調べている途中で止まったときは、その操作を通さずに人に確認する。
 
 ## 注意
 
