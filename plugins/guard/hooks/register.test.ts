@@ -7,7 +7,7 @@ const PIPE_TO_SHELL =
 const RUN_REMOTE =
   'guard: eval・sh -c "$(curl …)"・<(curl …) でリモート取得したコードを実行しようとしています。一旦ファイルに保存し、内容を確認してから実行してください。'
 const CHMOD_WORLD_WRITABLE =
-  'guard: chmod で誰でも書き込める権限（777・o+w など）にしようとしています。必要最小の権限（例: 644 / 755）を指定してください。'
+  'guard: chmod で誰でも書き込める権限（777、666、o+w など）にしようとしています。必要最小の権限（例: 644 / 755）を指定してください。'
 const WRITE_SHELL_CONFIG =
   'guard: シェル起動ファイル（~/.zshrc・~/.zshenv・~/.config/zsh/ など）や ~/.ssh に書き込もうとしています。自動実行や認証情報の改ざん経路になり得ます。'
 const WRITE_AGENT_CONFIG =
@@ -102,8 +102,16 @@ test('誰でも書き込める権限にする chmod を拒否する', async ($, 
   await expectDenied($, CHMOD_WORLD_WRITABLE, [
     'chmod 777 secret.key',
     'chmod -R 0777 dir',
+    'chmod 666 secret.key',
+    'chmod 757 dir',
+    'chmod -R 0776 dir',
+    'chmod 1777 dir',
+    'chmod 66 secret.key',
+    'chmod 7 secret.key',
     'chmod a+rwx secret.key',
     'chmod -R o+w dir',
+    'chmod u=rwx,o=w secret.key',
+    'chmod ug+x,o+w script.sh',
   ])
 })
 
@@ -155,7 +163,17 @@ test('fnox から秘密の値を出力するコマンドを拒否する', async 
 test('誰でも書き込める権限にしない chmod は通す', async ($, on) => {
   startSession(on)
 
-  await expectRun($, ['chmod 755 script.sh', 'chmod +x script.sh', 'chmod u+w script.sh'])
+  await expectRun($, [
+    'chmod 755 script.sh',
+    'chmod 644 notes.txt',
+    'chmod 775 dir',
+    'chmod 600 id_ed25519',
+    'chmod 2755 dir',
+    'chmod 4755 bin',
+    'chmod +x script.sh',
+    'chmod u+w script.sh',
+    'chmod u+w,o+r notes.txt',
+  ])
 })
 
 test('取得したものをシェルに渡さない curl は通す', async ($, on) => {
