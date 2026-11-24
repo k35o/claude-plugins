@@ -4,16 +4,24 @@ import { refsIn, repoOf } from './external-refs'
 import { runtimesIn } from './unmanaged-runtimes'
 import { unsafeReason } from './unsafe-commands'
 
+const commandOf = (input: unknown) =>
+  typeof input === 'object' &&
+  input !== null &&
+  'command' in input &&
+  typeof input.command === 'string'
+    ? input.command
+    : ''
+
 // どのフックにも .catch を付けない。ガードが落ちたときに全ての Bash を止めるより、素通しにするほうを選ぶ。
 export const register: Register = on => {
-  on('tool.call', { tool: 'Bash' }, ($, e, next) => {
-    const reason = unsafeReason(e.command)
+  on('tool.check', { tool: 'Bash' }, (_$, e, next) => {
+    const reason = unsafeReason(commandOf(e.input))
 
-    return reason ? { deny: `${$.plugin.name}: ${reason}` } : next(e)
+    return reason ? { decision: 'deny', reason } : next(e)
   })
 
-  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    const refs = refsIn(e.command)
+  on('tool.check', { tool: 'Bash' }, async ($, e, next) => {
+    const refs = refsIn(commandOf(e.input))
 
     if (refs.length === 0) {
       return next(e)
@@ -25,15 +33,16 @@ export const register: Register = on => {
 
     return external.length > 0
       ? {
-          deny: `${$.plugin.name}: 外部リポジトリの Issue・PR への参照（${external.join('、')}）が含まれています。GitHub が相手のリポジトリに被リンクを残すので、削るか、バッククォートで囲んでオートリンクを止めてください。`,
+          decision: 'deny',
+          reason: `外部リポジトリの Issue・PR への参照（${external.join('、')}）が含まれています。GitHub が相手のリポジトリに被リンクを残すので、削るか、バッククォートで囲んでオートリンクを止めてください。`,
         }
       : next(e)
   })
 
-  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+  on('tool.check', { tool: 'Bash' }, async ($, e, next) => {
     // シムはインストール済みの全ての道具にあるので、コマンドの場所ではなく mise which の成否で、ここで有効かを見る。
     const checked = await Promise.all(
-      runtimesIn(e.command).map(async bin => ({
+      runtimesIn(commandOf(e.input)).map(async bin => ({
         bin,
         isManaged: (await $.process.run(['mise', 'which', bin])).exitCode === 0,
       })),
@@ -42,7 +51,8 @@ export const register: Register = on => {
 
     return unmanaged.length > 0
       ? {
-          deny: `${$.plugin.name}: mise で管理していない言語のコマンド（${unmanaged.join('、')}）を実行しようとしています。スクリプトは mise で管理している node、bun、deno で書いてください。この言語が要るなら、mise に足すかをユーザーに確認してください。`,
+          decision: 'deny',
+          reason: `mise で管理していない言語のコマンド（${unmanaged.join('、')}）を実行しようとしています。スクリプトは mise で管理している node、bun、deno で書いてください。この言語が要るなら、mise に足すかをユーザーに確認してください。`,
         }
       : next(e)
   })
