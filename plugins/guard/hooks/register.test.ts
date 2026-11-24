@@ -14,6 +14,8 @@ const WRITE_SHELL_CONFIG =
   'シェル起動ファイル（~/.zshrc・~/.zshenv・~/.config/zsh/ など）や ~/.ssh に書き込もうとしています。自動実行や認証情報の改ざん経路になり得ます。'
 const WRITE_AGENT_CONFIG =
   'Claude Code の設定やフック、プラグイン（.claude/settings*.json・hooks・plugins）にシェルから書き込もうとしています。権限やガードを外す経路になり得ます。変更が必要ならユーザーに確認してください。'
+const GUARD_FAILED =
+  'guard がこの操作を調べている途中で止まりました。安全かどうかを判定できていないので、内容を確かめてください。'
 
 const externalRefs = (refs: string) =>
   `外部リポジトリの Issue・PR への参照（${refs}）が含まれています。GitHub が相手のリポジトリに被リンクを残すので、削るか、バッククォートで囲んでオートリンクを止めてください。`
@@ -54,6 +56,7 @@ type Verdict = { decision: string; reason?: string }
 
 const ALLOWED: Verdict = { decision: 'allow' }
 const denied = (reason: string): Verdict => ({ decision: 'deny', reason })
+const asked = (reason: string): Verdict => ({ decision: 'ask', reason })
 
 const verdictOf = async ($: Engine, tool: string, input: unknown): Promise<Verdict> => {
   const { decision, reason } = await $.tool.check({ tool, input })
@@ -439,4 +442,16 @@ test('実行されない位置にある言語の名前は通す', async ($, on) 
     'cat docs/perl.md',
     'echo ruby',
   ])
+})
+
+test('調べている途中で guard が止まったら、通さずに人に確認する', async ($, on) => {
+  on('tool.check', () => ({ decision: 'allow' }))
+  on('process.run', () => {
+    throw new Error('mise を起動できない')
+  })
+  on('session.repo', () => {
+    throw new Error('リポジトリを読めない')
+  })
+
+  await expectBash($, asked(GUARD_FAILED), ['python3 gen.py', 'git commit -m "fix: a/b#1"'])
 })

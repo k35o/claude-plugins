@@ -12,13 +12,20 @@ const commandOf = (input: unknown) =>
     ? input.command
     : ''
 
-// どのフックにも .catch を付けない。ガードが落ちたときに全ての Bash を止めるより、素通しにするほうを選ぶ。
+// 失敗したフックは飛ばされて下の判定がそのまま通るので、調べきれなかった操作は人に確認する。
+const askPerson = () =>
+  ({
+    decision: 'ask',
+    reason:
+      'guard がこの操作を調べている途中で止まりました。安全かどうかを判定できていないので、内容を確かめてください。',
+  }) as const
+
 export const register: Register = on => {
   on('tool.check', { tool: 'Bash' }, (_$, e, next) => {
     const reason = unsafeReason(commandOf(e.input))
 
     return reason ? { decision: 'deny', reason } : next(e)
-  })
+  }).catch(askPerson)
 
   on('tool.check', { tool: 'Bash' }, async ($, e, next) => {
     const refs = refsIn(commandOf(e.input))
@@ -37,7 +44,7 @@ export const register: Register = on => {
           reason: `外部リポジトリの Issue・PR への参照（${external.join('、')}）が含まれています。GitHub が相手のリポジトリに被リンクを残すので、削るか、バッククォートで囲んでオートリンクを止めてください。`,
         }
       : next(e)
-  })
+  }).catch(askPerson)
 
   on('tool.check', { tool: 'Bash' }, async ($, e, next) => {
     // シムはインストール済みの全ての道具にあるので、コマンドの場所ではなく mise which の成否で、ここで有効かを見る。
@@ -55,5 +62,5 @@ export const register: Register = on => {
           reason: `mise で管理していない言語のコマンド（${unmanaged.join('、')}）を実行しようとしています。スクリプトは mise で管理している node、bun、deno で書いてください。この言語が要るなら、mise に足すかをユーザーに確認してください。`,
         }
       : next(e)
-  })
+  }).catch(askPerson)
 }
