@@ -1,4 +1,4 @@
-# React Server Components / Server Actions
+# React Server Components / Server Functions
 
 ## Server Components
 
@@ -18,7 +18,7 @@
 
 ### 注意
 
-- Server Componentsに`"use server"`ディレクティブは**不要**。`"use server"`はServer Actionsのためのもの
+- Server Componentsに`"use server"`ディレクティブは**不要**。`"use server"`はServer Functionsのためのもの
 - Server Componentsがデフォルト。`"use client"`をつけたものだけがClient Component
 
 ## "use client"
@@ -53,7 +53,9 @@ export default function Page() {
     </div>
   );
 }
+```
 
+```tsx
 // ✅ インタラクティブな部分だけを分離
 // page.tsx (Server Component)
 export default function Page() {
@@ -64,26 +66,32 @@ export default function Page() {
     </div>
   );
 }
+```
 
+```tsx
 // counter.tsx
-('use client');
+'use client';
 export function Counter() {
   const [count, setCount] = useState(0);
   return <button onClick={() => setCount((c) => c + 1)}>{count}</button>;
 }
 ```
 
-## "use server" / Server Actions
+## "use server" / Server Functions
+
+`"use server"`をつけた関数がServer Functions。Server Functionsのうち、`<form action>`のようなactionのpropに渡したものや、Actionの中から呼んだものをServer Actionsと呼ぶ。
 
 ### ルール
 
 - 非同期関数でのみ使用可能
 - 引数と返り値はシリアライズ可能でなければならない
 - クラス、一般的な関数、イベントオブジェクト、DOM要素は渡せない
+- サーバーの状態を変える処理に使う。データの取得には使わない（フレームワークは1つずつ処理し、返り値をキャッシュしない）
+- フォームの外から呼ぶときは`startTransition`の中で呼ぶ。`<form action>`と`formAction`に渡したものは自動でTransitionになる
 
 ### セキュリティ
 
-**Server Actionsの引数は信頼できない入力として扱う。**
+**Server Functionsの引数は信頼できない入力として扱う。**
 
 ```tsx
 // ❌ 危険: クライアントからのIDをそのまま信頼
@@ -121,26 +129,49 @@ async function updateName(formData: FormData) {
 
 ### useActionStateとの組み合わせ
 
-pending状態、エラー、結果を自動管理する:
+pending状態、エラー、結果を自動管理する。`useActionState`に渡す関数は、第1引数に前回のstate、第2引数に`FormData`を受け取る:
 
 ```tsx
-'use client';
-const [state, submitAction, isPending] = useActionState(updateName, {
-  error: null,
-});
+// actions.ts
+'use server';
+export async function updateName(prevState: { error: string | null }, formData: FormData) {
+  const name = formData.get('name');
+  if (!name) return { error: '名前を入力してください' };
+  await db.users.update({ name });
+  return { error: null };
+}
+```
 
-<form action={submitAction}>
-  <input type="text" name="name" />
-  <button disabled={isPending}>{isPending ? '送信中...' : '更新'}</button>
-  {state.error && <p>{state.error}</p>}
-</form>;
+```tsx
+// name-form.tsx
+'use client';
+import { useActionState } from 'react';
+import { updateName } from './actions';
+
+export function NameForm() {
+  const [state, submitAction, isPending] = useActionState(updateName, {
+    error: null,
+  });
+
+  return (
+    <form action={submitAction}>
+      <input type="text" name="name" />
+      <button disabled={isPending}>{isPending ? '送信中...' : '更新'}</button>
+      {state.error && <p>{state.error}</p>}
+    </form>
+  );
+}
 ```
 
 ## シリアライズ可能な型（サーバー↔クライアント）
 
-**可能:** string, number, bigint, boolean, undefined, null, Date, プレーンオブジェクト, 配列, Map, Set, TypedArray, ArrayBuffer, Promise, JSX要素, Server Actions
+Server ComponentからClient Componentに渡すpropsと、Server Functionsの返り値:
 
-**不可:** 一般的な関数, クラス, クラスインスタンス, DOMノード, イベントオブジェクト, 未登録Symbol
+**可能:** string, number, bigint, boolean, undefined, null, `Symbol.for`で登録したSymbol, Date, プレーンオブジェクト, 配列, Map, Set, TypedArray, ArrayBuffer, Promise, JSX要素, Server Functions
+
+**不可:** Server Functions以外の関数, クラス, クラスインスタンス, nullプロトタイプのオブジェクト, 未登録Symbol
+
+Server Functionsの引数には、上の型に加えて`FormData`を渡せる。JSX要素とイベントオブジェクトは渡せない。
 
 ## Server ComponentからClient Componentへのデータの渡し方
 
@@ -156,9 +187,11 @@ async function Page() {
   const dataPromise = fetchData(); // awaitしない
   return <ClientChart dataPromise={dataPromise} />;
 }
+```
 
+```tsx
 // client-chart.tsx
-('use client');
+'use client';
 function ClientChart({ dataPromise }) {
   const data = use(dataPromise); // Suspenseと組み合わせる
   return <Chart data={data} />;
@@ -178,9 +211,11 @@ export default function Layout({ children }) {
     </ClientSidebar>
   );
 }
+```
 
+```tsx
 // client-sidebar.tsx
-('use client');
+'use client';
 export function ClientSidebar({ children }) {
   const [isOpen, setIsOpen] = useState(true);
   return (

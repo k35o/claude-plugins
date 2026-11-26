@@ -30,7 +30,8 @@ useEffectは外部システム（ブラウザAPI、サードパーティライ�
 ## React 19とConcurrent
 
 - 非同期処理の状態管理はActions（`useTransition`とasync関数）を使う。フォームは`useActionState`、楽観的UIは`useOptimistic`。
-- Promiseやコンテキストは`use`でレンダー中に読む。条件分岐の中でも呼べる。
+- Promiseやコンテキストは`use`でレンダー中に読む。条件分岐の中でも呼べる。try-catchの中では呼べないので、rejectはError Boundaryで受ける。
+- Client Componentで`use`に渡すPromiseは、レンダーをまたいで同じものを使う。レンダー中に`fetch`やasync関数を呼ぶと毎回新しいPromiseになり、fallbackが出続ける。Server Componentやイベントハンドラ、ルートのローダーで作ったPromiseを渡すか、キャッシュする。
 - refコールバックはクリーンアップ関数を返せる。
 - 重いstate更新は`startTransition`、高頻度で変わる値は`useDeferredValue`、非同期データの読み込み中の表示は`Suspense`で扱う。ローディング状態をuseStateとuseEffectで管理しない。
 
@@ -39,7 +40,8 @@ useEffectは外部システム（ブラウザAPI、サードパーティライ�
 Server Componentsが既定で、`"use client"`を付けたものだけがClient Componentになる。
 
 - `"use client"`の境界はできるだけ葉に近い位置に置く。ページ全体をClient Componentにしない。
-- Server Actionsの引数は信頼できない入力として扱い、認証と認可を必ず検証する。
+- Server Functions（`"use server"`の関数）の引数は信頼できない入力として扱い、認証と認可を必ず検証する。
+- Server Functionsはサーバーの状態を変える処理に使い、データの取得には使わない。データはServer Componentで取得する。
 - サーバーとクライアントの間で渡すデータはシリアライズ可能にする。
 
 `"use client"`と`"use server"`の細かいルール、compositionパターン、シリアライズ可能な型を確かめるときは [references/rsc.md](references/rsc.md) を読む。
