@@ -1,6 +1,6 @@
 ---
 name: react
-description: Reactのコンポーネントやフックを書く、直す、レビューするときに使う。useEffectやuseRefの使い方、React 19の新しいAPI、Server Componentsの境界を判断するときや、「Reactで作って」「このコンポーネント直して」「useEffect要る？」と言われたときにも使う。
+description: Reactのコンポーネントやフックを書く、直す、レビューするときに使う。useEffectやuseRefの使い方、メモ化とReact Compiler、React 19の新しいAPI、Server Componentsの境界を判断するときや、「Reactで作って」「このコンポーネント直して」「useEffect要る？」「useMemo要る？」と言われたときにも使う。
 ---
 
 # React
@@ -26,6 +26,17 @@ useEffectは外部システム（ブラウザAPI、サードパーティライ�
 ## ref
 
 レンダー中に`ref.current`を読み書きしない（一度きりの初期化は例外）。フォーカスやスクロール、リスト内の複数ref、`useImperativeHandle`、`flushSync`を扱うときは [references/dom-refs.md](references/dom-refs.md) を読む。
+
+## メモ化とReact Compiler
+
+`useMemo`、`useCallback`、`memo`を書く前、外す前に、プロジェクトでReact Compilerが有効かを確かめる。
+
+- 有効なら、新しいコードに手でメモ化を書かない。コンパイラがコンポーネントとフックの中の値、関数、JSXをメモ化する。
+- 有効でも、エフェクトの依存に入る値の参照を固定したいときは`useMemo`と`useCallback`を逃げ道として使う。
+- 既存のメモ化は、外すとコンパイル結果が変わる。外すならテストで確かめる。
+- 無効なら、計測して重いと分かった計算と、`memo`した子に渡す値や関数だけをメモ化する。
+
+有効かの見分け方、コンパイラがメモ化しないもの、コンパイラで壊れるコードと`"use no memo"`を確かめるときは [references/react-compiler.md](references/react-compiler.md) を読む。
 
 ## React 19とConcurrent
 

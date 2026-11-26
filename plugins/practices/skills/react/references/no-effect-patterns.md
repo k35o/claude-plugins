@@ -24,7 +24,10 @@ useEffect(() => {
   setFilteredList(heavyFilter(items));
 }, [items]);
 
-// ✅ useMemoでメモ化する
+// ✅ React Compilerが有効なら、レンダー中にそのまま計算する（コンパイラがメモ化する）
+const filteredList = heavyFilter(items);
+
+// ✅ 有効でなく、計測して重いならuseMemoでメモ化する
 const filteredList = useMemo(() => heavyFilter(items), [items]);
 ```
 
