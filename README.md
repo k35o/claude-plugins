@@ -8,6 +8,7 @@ k8o 個人用の Claude Code プラグイン marketplace。
 | `hud` | プロンプト上の帯に、使用上限と日付・時刻・天気を出す |
 | `theme` | アプリの色と会話の裏の背景を、k8o.me のダークの見た目にする |
 | `guard` | 危険なシェルコマンド、mise で管理していない言語の実行、他のリポジトリへの被リンクになる参照を実行前に拒否し、設定ファイルへの書き込みを人に確認する |
+| `practices` | コードを書く、レビューするときの k8o の判断基準を、スキルとして配る |
 
 ## 使い方
 
@@ -19,6 +20,7 @@ claude plugin install mcp@k8o -s user
 claude plugin install hud@k8o -s user
 claude plugin install theme@k8o -s user
 claude plugin install guard@k8o -s user
+claude plugin install practices@k8o -s user
 ```
 
 以後 MCP の増減は [`plugins/mcp/.mcp.json`](plugins/mcp/.mcp.json) を編集して push するだけ。各マシンでは:
@@ -86,6 +88,16 @@ Bash のコマンドが次のどれかに当たると拒否する。
 `/` や `~` の再帰削除は、Claude Code 自身が危険な操作として見ているので、guard では見ない。
 
 コマンドの文字列を正規表現で見るだけなので、すり抜ける書き方はある。コミットメッセージなどの文字列にある `chmod 777` を、誤って拒否することもある。権限の `deny` と `ask` は別に設定しておく。guard が調べている途中で止まったときは、その操作を通さずに人に確認する。
+
+## practices
+
+コードを書く、レビューするときの判断基準をスキルにしたもの。スキル名は `practices:<スキル名>` になる。
+
+| スキル | 使う場面 |
+| --- | --- |
+| `practices:testing` | テストを書く、設計する、レビューする |
+
+- スキルは Read、Grep、Glob、Skill しか使えない読み取り専用の環境でも読む。参照はスキルのディレクトリ内の相対パスで書き、`~/.claude` のような利用者の環境を前提にしない。
 
 ## 注意
 
