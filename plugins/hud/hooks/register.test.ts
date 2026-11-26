@@ -55,9 +55,11 @@ const TODAY = {
 
 const SUNNY = { weather_code: 0, temperature_2m: 18.4, is_day: 1 }
 
+type Answer = { value: HttpResponse } | Promise<{ value: HttpResponse }>
+
 type World = {
-  usage?: () => { value: HttpResponse }
-  weather?: () => { value: HttpResponse }
+  usage?: () => Answer
+  weather?: () => Answer
   authorization?: SessionAuthorization
 }
 
@@ -66,7 +68,15 @@ const startSession = (on: On, world: World = {}) => {
   const requests: { url: string; headers?: Record<string, string>; auth?: string }[] = []
   const usage = world.usage ?? (() => ok(USAGE))
   const weather = world.weather ?? (() => ok({ current: SUNNY, daily: TODAY }))
+  // ほかのセッションと共有する store の中身をテストから読み書きするため、mock.store ではなく素のオブジェクトで持つ。
+  const store: Record<string, unknown> = {}
 
+  on('store.get', (_, e) => ({ value: store[e.key] }))
+  on('store.set', (_, e) => {
+    store[e.key] = JSON.parse(JSON.stringify(e.value))
+
+    return { value: undefined }
+  })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
   on('session.authorize', () => ({
@@ -81,11 +91,22 @@ const startSession = (on: On, world: World = {}) => {
     return e.url === USAGE_URL ? usage() : weather()
   })
 
-  return { clock, requests }
+  return { clock, requests, store }
 }
 
 const start = ($: Engine) =>
   $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+
+const bandTexts = async ($: Engine) => {
+  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+  const texts = (await ui.findAll({ type: 'Text' })).map(text => text.text)
+  await ui.unmount()
+
+  return texts
+}
+
+const measureRateLimits = ($: Engine, rateLimits: { kind: string; percentUsed: number }[]) =>
+  $.session.measure({ context: { window: 200_000 }, rateLimits, changed: ['rateLimits'] })
 
 test('帯の左に、/usage と同じ取得先から取った使用率とリセットを出す', async ($, on) => {
   const { requests } = startSession(on)
@@ -106,7 +127,7 @@ test('帯の左に、/usage と同じ取得先から取った使用率とリセ�
   }
 })
 
-test('使用率は5分ごとに取り直し、70%以上は警告色、90%以上はエラー色で描く', async ($, on) => {
+test('使用率は1分ごとに取り直し、70%以上は警告色、90%以上はエラー色で描く', async ($, on) => {
   let usage: unknown = { five_hour: window(69), seven_day: window(70) }
   const { clock } = startSession(on, { usage: () => ok(usage) })
   await start($)
@@ -122,7 +143,7 @@ test('使用率は5分ごとに取り直し、70%以上は警告色、90%以上�
   expect(await colors()).toEqual([TEAL, AMBER])
 
   usage = { five_hour: window(69), seven_day: window(90) }
-  await clock.advance(5 * 60_000)
+  await clock.advance(60_000)
 
   expect(await colors()).toEqual([TEAL, RED])
 })
@@ -133,17 +154,27 @@ test('このセッションの応答で使用率が動いたら、その場で�
   await start($)
 
   usage = { five_hour: window(100), seven_day: window(17) }
-  await $.session.measure({
-    context: { window: 200_000 },
-    rateLimits: [{ kind: 'five_hour', percentUsed: 93 }],
-    changed: ['rateLimits'],
-  })
+  await clock.advance(10_000)
+  await measureRateLimits($, [{ kind: 'five_hour', percentUsed: 93 }])
   await clock.settle()
 
-  const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
-  const texts = (await ui.findAll({ type: 'Text' })).map(text => text.text)
-  expect(texts.slice(0, 4)).toEqual(['5h', '100%', '7d', '17%'])
-  await ui.unmount()
+  expect((await bandTexts($)).slice(0, 4)).toEqual(['5h', '100%', '7d', '17%'])
+})
+
+test('このセッションの応答で使用率が動いて取り直せなければ、応答に付いてきた使用率を出す', async ($, on) => {
+  let isUp = true
+  const { clock } = startSession(on, { usage: () => (isUp ? ok(USAGE) : unavailable()) })
+  await start($)
+
+  isUp = false
+  await clock.advance(10_000)
+  await measureRateLimits($, [
+    { kind: 'seven_day', percentUsed: 89 },
+    { kind: 'five_hour', percentUsed: 47.5 },
+  ])
+  await clock.settle()
+
+  expect((await bandTexts($)).slice(0, 4)).toEqual(['5h', '48%', '7d', '89%'])
 })
 
 test('取り直しに失敗したら、前に取れた使用率を出し続ける', async ($, on) => {
@@ -157,6 +188,67 @@ test('取り直しに失敗したら、前に取れた使用率を出し続け�
   const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
   expect((await ui.find({ type: 'Text', text: '42%' }))?.text).toBe('42%')
   await ui.unmount()
+})
+
+test('セッションを開いたときに取れなくても、1分後に取り直して出す', async ($, on) => {
+  let isUp = false
+  const { clock } = startSession(on, { usage: () => (isUp ? ok(USAGE) : unavailable()) })
+  await start($)
+
+  isUp = true
+  await clock.advance(60_000)
+
+  expect((await bandTexts($)).slice(0, 6)).toEqual(['5h', '42%', '16:00', '7d', '88%', '11/14'])
+})
+
+test('先に出した取り直しが後から返っても、新しい使用率を古い値で上書きしない', async ($, on) => {
+  let respond = (): Answer => ok(USAGE)
+  const { clock } = startSession(on, { usage: () => respond() })
+  await start($)
+
+  respond = async () => {
+    await clock.sleep(10_000)
+
+    return ok({ five_hour: window(50), seven_day: window(90) })
+  }
+  await clock.advance(60_000)
+
+  respond = () => ok({ five_hour: window(60), seven_day: window(91) })
+  await clock.advance(1_000)
+  await measureRateLimits($, [{ kind: 'five_hour', percentUsed: 60 }])
+  await clock.advance(10_000)
+
+  expect((await bandTexts($)).slice(0, 4)).toEqual(['5h', '60%', '7d', '91%'])
+})
+
+test('取った使用率は、ほかのセッションが読めるように保存する', async ($, on) => {
+  const { store } = startSession(on)
+  await start($)
+
+  expect(store.usage).toEqual({
+    limits: [
+      { kind: 'five_hour', percentUsed: 42.4, resetsAt: local(11, 9, 16, 0).toISOString() },
+      { kind: 'seven_day', percentUsed: 88, resetsAt: local(11, 14, 9, 5).toISOString() },
+    ],
+    at: NOW,
+  })
+})
+
+test('ほかのセッションが保存した新しい使用率は、取りに行かずに1分以内に出す', async ($, on) => {
+  const { clock, requests, store } = startSession(on)
+  await start($)
+
+  store.usage = {
+    limits: [
+      { kind: 'five_hour', percentUsed: 77 },
+      { kind: 'seven_day', percentUsed: 90 },
+    ],
+    at: NOW + 30_000,
+  }
+  await clock.advance(60_000)
+
+  expect((await bandTexts($)).slice(0, 4)).toEqual(['5h', '77%', '7d', '90%'])
+  expect(requests.filter(request => request.url === USAGE_URL)).toHaveLength(1)
 })
 
 test('サブスクリプションの認証がなければ使用率を取りに行かない', async ($, on) => {

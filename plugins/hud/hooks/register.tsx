@@ -9,10 +9,15 @@ type Weather = {
   rainChance: number
 }
 
+type Reading = {
+  limits: SessionRateLimit[]
+  at: number
+}
+
 const MINUTE = 60_000
-const USAGE_INTERVAL = 5 * MINUTE
 const WEATHER_INTERVAL = 30 * MINUTE
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const USAGE_KEY = 'usage'
 const WINDOWS = ['five_hour', 'seven_day'] as const
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 const LABELS: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
@@ -97,17 +102,28 @@ const parseUsage = (text: string): SessionRateLimit[] => {
   })
 }
 
+const isReading = (value: unknown): value is Reading =>
+  typeof value === 'object' &&
+  value !== null &&
+  'at' in value &&
+  typeof value.at === 'number' &&
+  'limits' in value &&
+  Array.isArray(value.limits)
+
+const newer = (a: Reading | undefined, b: Reading | undefined) =>
+  b !== undefined && (a === undefined || b.at > a.at) ? b : a
+
 let weatherUrl = ''
-let limits: SessionRateLimit[] = []
+let latest: Reading | undefined
 let weather: Weather | undefined
 
 // セッションの応答に付く使用率は、他のセッションや端末で使った分が次の応答まで
 // 反映されないので、/usage と同じ取得先からアカウント全体の値を取る。
-const loadUsage = async ($: EngineInterface) => {
+const fetchUsage = async ($: EngineInterface) => {
   const authorization = await $.session.authorize()
 
   if (authorization?.kind !== 'bearer') {
-    return
+    return undefined
   }
 
   try {
@@ -116,13 +132,43 @@ const loadUsage = async ($: EngineInterface) => {
       headers: { 'anthropic-beta': 'oauth-2025-04-20' },
     })
 
-    if (response.ok) {
-      limits = parseUsage(response.text)
-    }
+    return response.ok ? parseUsage(response.text) : undefined
   } catch {
+    return undefined
+  }
+}
+
+const share = async ($: EngineInterface, reading?: Reading) => {
+  const stored = await $.store.get(USAGE_KEY).catch(() => undefined)
+  const shared = isReading(stored) ? stored : undefined
+  const newest = newer(newer(latest, shared), reading)
+
+  if (newest === undefined) {
     return
   }
-  $.ui.invalidate('ui.render')
+  if (newest !== latest) {
+    latest = newest
+    $.ui.invalidate('ui.render')
+  }
+  if (newest.at !== shared?.at) {
+    await $.store.set(USAGE_KEY, newest).catch(() => undefined)
+  }
+}
+
+const refreshUsage = async ($: EngineInterface, fallback: SessionRateLimit[] = []) => {
+  const at = await $.clock.now()
+  const limits = (await fetchUsage($)) ?? fallback
+
+  await share($, limits.length > 0 ? { limits, at } : undefined)
+}
+
+const checkUsage = async ($: EngineInterface) => {
+  await share($)
+
+  if (latest !== undefined && (await $.clock.now()) - latest.at < MINUTE) {
+    return
+  }
+  await refreshUsage($)
 }
 
 const loadWeather = async ($: EngineInterface) => {
@@ -152,16 +198,20 @@ export const register: Register = (on, options) => {
       $.ui.invalidate('ui.render')
       $.clock.every(MINUTE, () => $.ui.invalidate('ui.render'))
     })
-    $.clock.every(USAGE_INTERVAL, () => void loadUsage($))
+    // 使用率の確認は分の変わり目に揃えない。揃えると、どのセッションも同じ時刻に
+    // 古いと判断して一斉に取りに行く。
+    $.clock.every(MINUTE, () => void checkUsage($))
     $.clock.every(WEATHER_INTERVAL, () => void loadWeather($))
-    await Promise.all([loadUsage($), loadWeather($)])
+    await Promise.all([checkUsage($), loadWeather($)])
 
     return started
   })
 
   on('session.measure', ($, e, next) => {
     if (e.changed.includes('rateLimits')) {
-      void loadUsage($)
+      const measured = WINDOWS.flatMap(kind => e.rateLimits.filter(limit => limit.kind === kind))
+
+      void refreshUsage($, measured)
     }
 
     return next(e)
@@ -198,7 +248,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="row" justifyContent="space-between" alignItems="center" gap="md">
         <Box flexDirection="row" alignItems="center" gap="md">
-          {limits.map(({ kind, percentUsed, resetsAt }) => {
+          {(latest?.limits ?? []).map(({ kind, percentUsed, resetsAt }) => {
             const label = LABELS[kind] ?? kind
 
             return (
