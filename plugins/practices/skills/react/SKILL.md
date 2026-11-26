@@ -21,7 +21,7 @@ description: Reactのコンポーネントやフックを書く、直す、レ�
 
 useEffectは外部システム（ブラウザAPI、サードパーティライブラリ、WebSocketなど）との同期のためだけに使う。エフェクトを書く前に [references/no-effect-patterns.md](references/no-effect-patterns.md) を読み、不要なパターンに当たらないかを確かめる。
 
-依存配列は選ぶものではなくコードから導出されるもの。オブジェクトや関数が依存配列に入りそうになったら [references/effect-dependencies.md](references/effect-dependencies.md) を読む。エフェクトを書いたら、カスタムフックへの抽出を検討する。
+依存配列は選ぶものではなくコードから導出されるもの。オブジェクトや関数が依存配列に入りそうになったら [references/effect-dependencies.md](references/effect-dependencies.md) を読む。エフェクトから最新のprops/stateを読みたいが、その変化では再実行したくない処理は`useEffectEvent`に切り出す。依存を減らすためだけには使わない。エフェクトを書いたら、カスタムフックへの抽出を検討する。
 
 ## ref
 
@@ -45,6 +45,8 @@ useEffectは外部システム（ブラウザAPI、サードパーティライ�
 - Client Componentで`use`に渡すPromiseは、レンダーをまたいで同じものを使う。レンダー中に`fetch`やasync関数を呼ぶと毎回新しいPromiseになり、fallbackが出続ける。Server Componentやイベントハンドラ、ルートのローダーで作ったPromiseを渡すか、キャッシュする。
 - refコールバックはクリーンアップ関数を返せる。
 - 重いstate更新は`startTransition`、高頻度で変わる値は`useDeferredValue`、非同期データの読み込み中の表示は`Suspense`で扱う。ローディング状態をuseStateとuseEffectで管理しない。
+- 隠しても中のstateやDOMを残したいUI（タブ、サイドバー）と、次に表示しそうなUIの先読みは、条件付きレンダーではなく`<Activity mode={isVisible ? 'visible' : 'hidden'}>`で切り替える。隠れている間はエフェクトがクリーンアップされ、propsの更新は低い優先度で描画される。
+- `<Activity>`で隠してもDOMは残るので、`<video>`、`<audio>`、`<iframe>`は再生が続く。`useLayoutEffect`のクリーンアップで止める。先読みされるのは`use`などSuspenseで読むデータだけで、エフェクトでの取得は先読みされない。
 
 ## Server Components
 
@@ -55,4 +57,9 @@ Server Componentsが既定で、`"use client"`を付けたものだけがClient 
 - Server Functionsはサーバーの状態を変える処理に使い、データの取得には使わない。データはServer Componentで取得する。
 - サーバーとクライアントの間で渡すデータはシリアライズ可能にする。
 
-`"use client"`と`"use server"`の細かいルール、compositionパターン、シリアライズ可能な型を確かめるときは [references/rsc.md](references/rsc.md) を読む。
+`"use client"`と`"use server"`の細かいルール、compositionパターン、シリアライズ可能な型、`cacheSignal`での中断を確かめるときは [references/rsc.md](references/rsc.md) を読む。
+
+## Gotcha
+
+- 安定版になったAPIを、学習データにある接頭辞つきの名前でimportしがち。`useEffectEvent`（旧`experimental_useEffectEvent`）と`<Activity>`（旧`unstable_Activity`）は、React 19.2から`react`の通常のexport。
+- 新しいAPIを書く、勧める前に`package.json`の`react`のバージョンを確かめる。`useEffectEvent`、`<Activity>`、`cacheSignal`は19.2から。

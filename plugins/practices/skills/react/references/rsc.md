@@ -21,6 +21,24 @@
 - Server Componentsに`"use server"`ディレクティブは**不要**。`"use server"`はServer Functionsのためのもの
 - Server Componentsがデフォルト。`"use client"`をつけたものだけがClient Component
 
+### cacheSignal
+
+`cache()`の寿命が終わったら、つまりレンダーが完了、中断、失敗したら、使われなくなった処理を中断する（React 19.2から）。
+
+```tsx
+import { cache, cacheSignal } from 'react';
+
+const dedupedFetch = cache(fetch);
+
+async function Component() {
+  await dedupedFetch(url, { signal: cacheSignal() });
+}
+```
+
+- `cacheSignal()`がAbortSignalを返すのはServer Componentのレンダー中だけ。レンダーの外とClient Componentでは`null`を返す。将来はClient Componentでも使われるので、`null`になる前提のコードは書かない
+- レンダーの外で始めた処理は中断できない。モジュールのトップレベルで`fetch(url, { signal: cacheSignal() })`と書かない
+- 中断で失敗したのか本当のエラーかは`cacheSignal()?.aborted`で見分け、中断ならエラーとして記録しない
+
 ## "use client"
 
 ### ルール
