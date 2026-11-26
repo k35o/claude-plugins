@@ -97,6 +97,7 @@ Bash のコマンドが次のどれかに当たると拒否する。
 | --- | --- |
 | `practices:react` | React のコンポーネントやフックを書く、直す、レビューする |
 | `practices:testing` | テストを書く、設計する、レビューする |
+| `practices:security` | 変更をレビューする（`/code-review` と `/security-review` を含む）。ハードルールに反する箇所を必ず指摘する |
 
 - スキルは Read、Grep、Glob、Skill しか使えない読み取り専用の環境でも読む。参照はスキルのディレクトリ内の相対パスで書き、`~/.claude` のような利用者の環境を前提にしない。
 
