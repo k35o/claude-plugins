@@ -25,7 +25,7 @@ useEffectは外部システム（ブラウザAPI、サードパーティライ�
 
 ## ref
 
-レンダー中に`ref.current`を読み書きしない（一度きりの初期化は例外）。フォーカスやスクロール、リスト内の複数ref、`useImperativeHandle`、`flushSync`を扱うときは [references/dom-refs.md](references/dom-refs.md) を読む。
+レンダー中に`ref.current`を読み書きしない（一度きりの初期化は例外）。兄弟要素のまとまりや、refを受け取らないコンポーネントのDOMを扱うときは、refのためだけにラッパーの`<div>`を足さず`<Fragment ref>`を使う。フォーカスやスクロール、リスト内の複数ref、`useImperativeHandle`、`flushSync`、Fragment refを扱うときは [references/dom-refs.md](references/dom-refs.md) を読む。
 
 ## メモ化とReact Compiler
 
@@ -47,6 +47,9 @@ useEffectは外部システム（ブラウザAPI、サードパーティライ�
 - 重いstate更新は`startTransition`、高頻度で変わる値は`useDeferredValue`、非同期データの読み込み中の表示は`Suspense`で扱う。ローディング状態をuseStateとuseEffectで管理しない。
 - 隠しても中のstateやDOMを残したいUI（タブ、サイドバー）と、次に表示しそうなUIの先読みは、条件付きレンダーではなく`<Activity mode={isVisible ? 'visible' : 'hidden'}>`で切り替える。隠れている間はエフェクトがクリーンアップされ、propsの更新は低い優先度で描画される。
 - `<Activity>`で隠してもDOMは残るので、`<video>`、`<audio>`、`<iframe>`は再生が続く。`useLayoutEffect`のクリーンアップで止める。先読みされるのは`use`などSuspenseで読むデータだけで、エフェクトでの取得は先読みされない。
+- 要素の出入りや変化のアニメーションは`<ViewTransition>`で包む。アニメーションするのは`startTransition`の中の更新、Suspenseの表示、`useDeferredValue`の更新だけで、ただの`setState`では動かない。`document.startViewTransition`は自分で呼ばない。
+- `<ViewTransition>`の見た目は`enter="slide-in"`のようなView Transition ClassとCSSの`::view-transition-new(.slide-in)`で書き、`view-transition-name`を直接指定しない。`name`は共有要素の遷移にだけ付ける。同じ更新で向きを変えたいときは`addTransitionType`で原因を足す。`prefers-reduced-motion`は自動では効かないので、CSSで弱めるか止める。
+- `localStorage`やローカルのタイムゾーンのように、ブラウザでしか正しく描画できないコンポーネントは、`mounted`フラグのuseStateとuseEffectや`typeof window`の分岐ではなく`use(browser())`（`react-dom`）でサーバーレンダリングから外す。サーバーでは最も近い`<Suspense>`のfallbackがHTMLに入るので、Suspenseで囲む。Client Componentでだけ呼べる。
 
 ## Server Components
 
@@ -57,9 +60,10 @@ Server Componentsが既定で、`"use client"`を付けたものだけがClient 
 - Server Functionsはサーバーの状態を変える処理に使い、データの取得には使わない。データはServer Componentで取得する。
 - サーバーとクライアントの間で渡すデータはシリアライズ可能にする。
 
-`"use client"`と`"use server"`の細かいルール、compositionパターン、シリアライズ可能な型、`cacheSignal`での中断を確かめるときは [references/rsc.md](references/rsc.md) を読む。
+`"use client"`と`"use server"`の細かいルール、compositionパターン、Contextの渡し方、シリアライズ可能な型、`cacheSignal`での中断を確かめるときは [references/rsc.md](references/rsc.md) を読む。
 
 ## Gotcha
 
 - 安定版になったAPIを、学習データにある接頭辞つきの名前でimportしがち。`useEffectEvent`（旧`experimental_useEffectEvent`）と`<Activity>`（旧`unstable_Activity`）は、React 19.2から`react`の通常のexport。
 - 新しいAPIを書く、勧める前に`package.json`の`react`のバージョンを確かめる。`useEffectEvent`、`<Activity>`、`cacheSignal`は19.2から。
+- `<ViewTransition>`（旧`unstable_ViewTransition`）と`addTransitionType`（旧`unstable_addTransitionType`）は、React 19.3から`react`の通常のexport。`<Fragment ref>`、`react-dom`の`browser`、Server Componentでの`<Context>`の描画も19.3から。

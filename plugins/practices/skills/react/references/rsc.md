@@ -8,13 +8,36 @@
 - 重いライブラリをサーバーだけで使う（クライアントバンドルに含まれない）
 - ビルド時またはリクエスト時に実行される
 - Promiseを作ってClient Componentに渡す（`use`で読む）
+- `"use client"`のモジュールからimportしたContextを`<Context value={...}>`で描画する（React 19.3から）
 
 ### できないこと
 
 - `useState`, `useReducer`, `useEffect` などのインタラクティブなフック
 - イベントハンドラ（`onClick`, `onChange` など）
 - ブラウザAPI（`localStorage`, `window` など）
-- Context（読み取りのみ不可。提供も不可）
+- Contextを作る、読む（`createContext`、`use`、`useContext`）
+
+### Contextを渡す
+
+Contextは`"use client"`のモジュールで作り、Server Componentからはそれをimportして直接描画する。値を渡すだけのProviderのラッパーコンポーネントは作らない。React 19.2以前はServer Componentから`<Context>`を描画できないので、ラッパーのClient Componentが要る。
+
+```tsx
+// user-context.tsx
+'use client';
+import { createContext } from 'react';
+
+export const UserContext = createContext(null);
+```
+
+```tsx
+// layout.tsx (Server Component)
+import { UserContext } from './user-context';
+
+export async function Layout({ children }) {
+  const currentUser = await getCurrentUser();
+  return <UserContext value={currentUser}>{children}</UserContext>;
+}
+```
 
 ### 注意
 

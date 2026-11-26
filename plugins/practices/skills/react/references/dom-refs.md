@@ -107,6 +107,38 @@ function handleAdd(text: string) {
 }
 ```
 
+## Fragment ref（React 19.3）
+
+兄弟要素のまとまりや、refを受け取らないコンポーネントのDOMを扱うときは、`<Fragment>`にrefを渡す。refのためだけにラッパーの`<div>`を足すと、スタイルやレイアウトが変わる。`<>...</>`にはrefを渡せないので、`Fragment`をimportする。
+
+```tsx
+import { Fragment, useEffect, useRef } from 'react';
+
+function PostList({ posts }) {
+  const fragmentRef = useRef(null);
+
+  useEffect(() => {
+    // 子孫を深さ優先でたどり、最初にフォーカスできる要素にフォーカスする
+    fragmentRef.current.focus();
+  }, []);
+
+  return (
+    <Fragment ref={fragmentRef}>
+      {posts.map((post) => (
+        <Heading key={post.id}>{post.title}</Heading>
+      ))}
+    </Fragment>
+  );
+}
+```
+
+refの値は`FragmentInstance`で、DOMの構造を変えずに子をまとめて扱う。
+
+- `addEventListener`、`removeEventListener`、`dispatchEvent`: 1階層目の子のイベント
+- `focus`、`focusLast`、`blur`: 子孫を深さ優先でたどるフォーカス移動
+- `observeUsing`、`unobserveUsing`: `IntersectionObserver`や`ResizeObserver`で1階層目の子を監視する
+- `getClientRects`、`getRootNode`、`compareDocumentPosition`、`scrollIntoView`: 1階層目の子の測定とスクロール
+
 ## refクリーンアップ（React 19）
 
 refコールバックからクリーンアップ関数を返せる。
