@@ -51,7 +51,14 @@ useEffect(() => {
   setSelection(null);
 }, [items]);
 
-// ✅ レンダー中に前回の値と比較して調整する
+// ✅ 選択中のIDを持ち、選択中の項目はレンダー中に求める
+const [selectedId, setSelectedId] = useState(null);
+const selection = items.find((item) => item.id === selectedId) ?? null;
+```
+
+まず`key`での全リセット（3）か、上のようにレンダー中に求める形にできないかを考える。どちらもできないときだけ、レンダー中に前回の値と比較して調整する。
+
+```tsx
 const [prevItems, setPrevItems] = useState(items);
 if (items !== prevItems) {
   setPrevItems(items);
@@ -118,15 +125,24 @@ useEffect(() => {
   loadAnalytics();
 }, []);
 
-// ✅ モジュールスコープで1回だけ実行
+// ✅ モジュールスコープのフラグで、アプリの読み込みごとに1回だけ実行する
 let didInit = false;
 function App() {
-  if (!didInit) {
-    didInit = true;
-    loadAnalytics();
-  }
+  useEffect(() => {
+    if (!didInit) {
+      didInit = true;
+      loadAnalytics();
+    }
+  }, []);
+}
+
+// ✅ モジュールの初期化時に実行する（ブラウザでだけ動かす）
+if (typeof window !== 'undefined') {
+  loadAnalytics();
 }
 ```
+
+レンダー中にモジュールスコープの変数を書き換えない。レンダーは純粋でなければならない。
 
 ## 9. 親への状態変更通知
 

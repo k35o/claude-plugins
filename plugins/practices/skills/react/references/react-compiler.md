@@ -5,8 +5,10 @@
 ## 有効かを確かめる
 
 - `babel-plugin-react-compiler`が依存にあり、Babel、Vite、Metro、Rsbuildの設定で読み込んでいる
-- Next.jsは`next.config`の`reactCompiler`で有効にする
-- Expo SDK 54以降は既定で有効
+- `@vitejs/plugin-react` 6.0.0以降は、`@rolldown/plugin-babel`に`reactCompilerPreset()`を渡して有効にする。設定ファイルに`babel-plugin-react-compiler`の文字列が出てこないことがある
+- React Routerは`vite-plugin-babel`にコンパイラのBabelプラグインを渡す
+- Next.jsは16から`next.config`のトップレベルの`reactCompiler`で有効にする。15までは`experimental.reactCompiler`
+- Expoは`app.json`の`expo.experiments.reactCompiler`で有効にする
 - `compilationMode: 'annotation'`のときは、`"use memo"`を書いた関数だけがコンパイルされる
 
 ## コンパイラがメモ化するもの
@@ -38,4 +40,4 @@
 
 ## lint
 
-`eslint-plugin-react-hooks`の`recommended`には、コンパイラの診断にもとづくルール（`set-state-in-effect`、`set-state-in-render`、`refs`、`purity`、`immutability`、`static-components`など）が入っている。コンパイラを入れていないプロジェクトでも使える。指摘されたら、無効化コメントで消さずにコードを直す。
+`eslint-plugin-react-hooks` 7.0.0以降の`recommended`には（6.1.xでは`recommended-latest`に）、コンパイラの診断にもとづくルール（`set-state-in-effect`、`set-state-in-render`、`refs`、`purity`、`immutability`、`static-components`など）が入っている。コンパイラを入れていないプロジェクトでも使える。指摘されたら、無効化コメントで消さずにコードを直す。

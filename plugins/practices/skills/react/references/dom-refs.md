@@ -34,21 +34,28 @@ ref.current?.scrollIntoView({
 
 ## リスト内の複数要素へのref（refコールバック）
 
-ループ内ではuseRefを呼べないため、refコールバックとMapを使う。
+ループ内ではuseRefを呼べないため、refコールバックとMapを使う。Mapは最初に使うときに作り、要素が外れたときの削除はrefコールバックが返すクリーンアップで行う。
 
 ```tsx
 function List({ items }) {
-  const mapRef = useRef<Map<string, HTMLElement>>(new Map());
+  const mapRef = useRef<Map<string, HTMLElement> | null>(null);
+
+  function getMap() {
+    if (!mapRef.current) {
+      mapRef.current = new Map();
+    }
+    return mapRef.current;
+  }
 
   return items.map((item) => (
     <li
       key={item.id}
       ref={(node) => {
-        if (node) {
-          mapRef.current.set(item.id, node);
-        } else {
-          mapRef.current.delete(item.id);
-        }
+        const map = getMap();
+        map.set(item.id, node);
+        return () => {
+          map.delete(item.id);
+        };
       }}
     >
       {item.text}
@@ -134,10 +141,14 @@ function PostList({ posts }) {
 
 refの値は`FragmentInstance`で、DOMの構造を変えずに子をまとめて扱う。
 
-- `addEventListener`、`removeEventListener`、`dispatchEvent`: 1階層目の子のイベント
-- `focus`、`focusLast`、`blur`: 子孫を深さ優先でたどるフォーカス移動
+- `addEventListener`、`removeEventListener`: 1階層目の子にイベントリスナーを付け外しする
+- `dispatchEvent`: Fragmentの位置でイベントを発火する。バブリングするイベントはFragmentの親のDOMへ伝わる
+- `focus`、`focusLast`: 子孫を深さ優先でたどり、フォーカスできる最初（最後）の要素にフォーカスする
+- `blur`: フォーカスされている要素がFragmentの中にあるときだけフォーカスを外す
 - `observeUsing`、`unobserveUsing`: `IntersectionObserver`や`ResizeObserver`で1階層目の子を監視する
 - `getClientRects`、`getRootNode`、`compareDocumentPosition`、`scrollIntoView`: 1階層目の子の測定とスクロール
+
+`FragmentInstance`の`scrollIntoView`は真偽値の`alignToTop`だけを受け取る。要素の`scrollIntoView({ behavior: 'smooth' })`のようにオプションのオブジェクトを渡すと例外になる。
 
 ## refクリーンアップ（React 19）
 
