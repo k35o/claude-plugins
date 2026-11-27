@@ -41,15 +41,16 @@ useEffectは外部システム（ブラウザAPI、サードパーティライ�
 ## React 19とConcurrent
 
 - 非同期処理の状態管理はActions（`useTransition`とasync関数）を使う。フォームは`useActionState`、楽観的UIは`useOptimistic`。
-- Promiseやコンテキストは`use`でレンダー中に読む。条件分岐の中でも呼べる。try-catchの中では呼べないので、rejectはError Boundaryで受ける。
+- Promiseやコンテキストは`use`でレンダー中に読む。条件分岐の中でも呼べる。try-catchの中では呼べないので、rejectはError Boundaryで受ける。サスペンドした`use`を、次のレンダーで条件分岐によって呼ばなくする書き方は、19.3から開発時に警告される。
 - Client Componentで`use`に渡すPromiseは、レンダーをまたいで同じものを使う。レンダー中に`fetch`やasync関数を呼ぶと毎回新しいPromiseになり、fallbackが出続ける。Server Componentやイベントハンドラ、ルートのローダーで作ったPromiseを渡すか、キャッシュする。
 - refコールバックはクリーンアップ関数を返せる。
 - 重いstate更新は`startTransition`、高頻度で変わる値は`useDeferredValue`、非同期データの読み込み中の表示は`Suspense`で扱う。ローディング状態をuseStateとuseEffectで管理しない。
 - 隠しても中のstateやDOMを残したいUI（タブ、サイドバー）と、次に表示しそうなUIの先読みは、条件付きレンダーではなく`<Activity mode={isVisible ? 'visible' : 'hidden'}>`で切り替える。隠れている間はエフェクトがクリーンアップされ、propsの更新は低い優先度で描画される。
 - `<Activity>`で隠してもDOMは残るので、`<video>`、`<audio>`、`<iframe>`は再生が続く。`useLayoutEffect`のクリーンアップで止める。先読みされるのは`use`などSuspenseで読むデータだけで、エフェクトでの取得は先読みされない。
 - 要素の出入りや変化のアニメーションは`<ViewTransition>`で包む。アニメーションするのは`startTransition`の中の更新、Suspenseの表示、`useDeferredValue`の更新だけで、ただの`setState`では動かない。`document.startViewTransition`は自分で呼ばない。
-- `<ViewTransition>`の見た目は`enter="slide-in"`のようなView Transition ClassとCSSの`::view-transition-new(.slide-in)`で書き、`view-transition-name`を直接指定しない。`name`は共有要素の遷移にだけ付ける。同じ更新で向きを変えたいときは`addTransitionType`で原因を足す。`prefers-reduced-motion`は自動では効かないので、CSSで弱めるか止める。
-- `localStorage`やローカルのタイムゾーンのように、ブラウザでしか正しく描画できないコンポーネントは、`mounted`フラグのuseStateとuseEffectや`typeof window`の分岐ではなく`use(browser())`（`react-dom`）でサーバーレンダリングから外す。サーバーでは最も近い`<Suspense>`のfallbackがHTMLに入るので、Suspenseで囲む。Client Componentでだけ呼べる。
+- `<ViewTransition>`はDOMノードの外側に置く。`<div>`の内側に置くと、出入りとリストの並べ替えのアニメーションが動かない。リストは各要素を`<ViewTransition key>`で包む。
+- `<ViewTransition>`の見た目は`enter="slide-in"`のようなView Transition ClassとCSSの`::view-transition-new(.slide-in)`で書き、`view-transition-name`を直接指定しない。`name`は共有要素の遷移にだけ付け、同時にマウントされる中で一意にする（重複するとエラーになる）。同じ更新で向きを変えたいときは`addTransitionType`で原因を足す。`prefers-reduced-motion`は自動では効かないので、CSSで弱めるか止める。
+- `localStorage`やローカルのタイムゾーンのように、ブラウザでしか正しく描画できないコンポーネントは、`mounted`フラグのuseStateとuseEffect、`typeof window`の分岐、フレームワークのSSRを無効にするオプションではなく`use(browser())`（`react-dom`）でサーバーレンダリングから外す。サーバーでは最も近い`<Suspense>`のfallbackがHTMLに入るので、Suspenseで囲む。Client Componentでだけ呼べる。サーバーで外れたことは`onError`には来ないので、観測するならサーバーレンダラーの`onBrowserBailout`を使う。
 
 ## Server Components
 
@@ -66,4 +67,7 @@ Server Componentsが既定で、`"use client"`を付けたものだけがClient 
 
 - 安定版になったAPIを、学習データにある接頭辞つきの名前でimportしがち。`useEffectEvent`（旧`experimental_useEffectEvent`）と`<Activity>`（旧`unstable_Activity`）は、React 19.2から`react`の通常のexport。
 - 新しいAPIを書く、勧める前に`package.json`の`react`のバージョンを確かめる。`useEffectEvent`、`<Activity>`、`cacheSignal`は19.2から。
-- `<ViewTransition>`（旧`unstable_ViewTransition`）と`addTransitionType`（旧`unstable_addTransitionType`）は、React 19.3から`react`の通常のexport。`<Fragment ref>`、`react-dom`の`browser`、Server Componentでの`<Context>`の描画も19.3から。
+- `<ViewTransition>`（旧`unstable_ViewTransition`）と`addTransitionType`（旧`unstable_addTransitionType`）は、React 19.3から`react`の通常のexport。`<Fragment ref>`、`react-dom`の`browser`、Server Componentでの`<Context>`と`<Activity>`の描画も19.3から。
+- 19.2.xには、`memo`や`forwardRef`のコンポーネントの中の`useEffectEvent`が最新の値を読まない不具合と、隠れた`<Activity>`の中の`useSyncExternalStore`が更新を取りこぼす不具合がある。どちらも19.3.0で直っているので、19.2.xで動きがおかしいときは先に上げる。
+- 19.3からStrict Modeはハイドレーションのときもエフェクトを2回実行する。開発中にだけ出る二重の副作用は、クリーンアップの漏れとして直す。
+- `onFullscreenChange`と`onFullscreenError`は19.3からJSXのpropで書ける。エフェクトの`addEventListener`で書かない。
