@@ -23,6 +23,11 @@
       "name": "guard",
       "source": "./plugins/guard",
       "description": "Refuses unsafe shell commands, runtimes mise does not manage and backlinks to other repositories, and asks before writes to shell and Claude Code configuration"
+    },
+    {
+      "name": "practices",
+      "source": "./plugins/practices",
+      "description": "k8o's practices for writing and reviewing code, as skills"
     }
   ]
 }
